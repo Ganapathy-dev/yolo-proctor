@@ -1,166 +1,137 @@
-import * as tf from '@tensorflow/tfjs'; // <-- important!
-import * as cocoSsd from '@tensorflow-models/coco-ssd';
+const COCO_CLASSES = ["person","chair","couch","bed","laptop","mouse","keyboard","cell phone","book","backpack","bottle","cup"];
 
-const video = document.getElementById('webcam') as HTMLVideoElement;
-const canvas = document.getElementById('canvas') as HTMLCanvasElement;
-const ctx = canvas.getContext('2d')!;
-const infoList = document.getElementById('info-list')!;
+import * as ort from "onnxruntime-web";
+import { initCamera } from "./utils";
 
-async function initCamera() {
-  const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-  video.srcObject = stream;
+const video = document.getElementById("webcam") as HTMLVideoElement;
+const uiLog = document.getElementById("log")!;
+const modelSelector = document.getElementById("modelSelector") as HTMLSelectElement;
 
-  await new Promise(resolve => video.onloadedmetadata = resolve);
+const canvas = document.createElement("canvas");
+const ctx = canvas.getContext("2d")!;
+canvas.width = 640;
+canvas.height = 640;
 
-  canvas.width = video.videoWidth;
-  canvas.height = video.videoHeight;
+let session: ort.InferenceSession | null = null;
+let loadingModel = false;
 
-  const wrapper = document.getElementById("video-wrapper")!;
-  wrapper.style.width = video.videoWidth + "px";
-  wrapper.style.height = video.videoHeight + "px";
+function sigmoid(x: number) {
+  return 1 / (1 + Math.exp(-x));
 }
 
-// Load model
-const loadModel = async () => {
-  const model = await cocoSsd.load();
-  return model;
-};
+async function loadModel(path: string) {
+  loadingModel = true;
 
-// Run detection
-const runDetection = async () => {
-  const model = await loadModel();
+  console.log(`📥 Loading model: ${path}`);
+  uiLog.textContent = `Loading model: ${path} ...`;
 
-  video.addEventListener('play', () => {
-    const detectFrame = async () => {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      const predictions = await model.detect(video);
-
-      predictions.forEach(pred => {
-        const [x, y, w, h] = pred.bbox;
-
-        ctx.strokeStyle = 'lime';
-        ctx.lineWidth = 3;
-        ctx.strokeRect(x, y, w, h);
-
-        ctx.font = "16px Arial";
-        ctx.fillStyle = 'lime';
-        ctx.fillText(`${pred.class} (${pred.score.toFixed(2)})`, x, y - 5);
-      });
-
-      requestAnimationFrame(detectFrame);
-    };
-
-    detectFrame();
+  session = await ort.InferenceSession.create(path, {
+    executionProviders: ["wasm"]
   });
-};
 
-// system information
-function getWebGLInfo() {
-  const tempCanvas = document.createElement('canvas');
-  const gl = (tempCanvas.getContext('webgl') ||
-              tempCanvas.getContext('experimental-webgl')) as WebGLRenderingContext | null;
+  console.log(`✅ Model loaded successfully: ${path}`);
+  uiLog.textContent = `Loaded model: ${path}`;
 
-  if (!gl) return { supported: false };
-
-  const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
-  return {
-    supported: true,
-    renderer: debugInfo ? gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL) : 'Unknown',
-    vendor: debugInfo ? gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL) : 'Unknown',
-    version: gl.getParameter(gl.VERSION),
-    shadingLanguage: gl.getParameter(gl.SHADING_LANGUAGE_VERSION),
-  };
+  loadingModel = false;
 }
 
-async function gatherSystemInfo(): Promise<Record<string, any>> {
-  const info: Record<string, any> = {};
+modelSelector.addEventListener("change", async () => {
+  await loadModel(modelSelector.value);
+});
 
-  const ua = navigator.userAgent;
-  const browserMatch = ua.match(/(Chrome|Firefox|Safari|Edge|Opera)\/(\d+)/);
+async function main() {
+  console.log("🎥 Initializing camera...");
+  await initCamera(video);
+  console.log("✔ Camera ready:", video.videoWidth, "x", video.videoHeight);
 
-  info['Browser'] = browserMatch ? `${browserMatch[1]} ${browserMatch[2]}` : ua.split(' ')[0];
-  info['User Agent'] = ua;
-  info['Platform'] = navigator.platform;
-  info['Language'] = navigator.language;
-  info['Cookie Enabled'] = navigator.cookieEnabled ? 'Yes' : 'No';
-  info['CPU Cores'] = navigator.hardwareConcurrency || null;
-  info['Device Memory'] = (navigator as any).deviceMemory ? `${(navigator as any).deviceMemory} GB` : null;
-  info['Screen Resolution'] = `${screen.width}x${screen.height}`;
-  info['Screen Color Depth'] = `${screen.colorDepth} bits`;
-  info['Window Size'] = `${window.innerWidth}x${window.innerHeight}`;
-  info['Device Pixel Ratio'] = window.devicePixelRatio || 1;
+  console.log("🔌 Loading initial model...");
+  await loadModel(modelSelector.value);
 
-  const webglInfo = getWebGLInfo();
-  info['WebGL Support'] = webglInfo.supported ? 'Yes' : 'No';
-  if (webglInfo.supported) {
-    info['WebGL Renderer'] = webglInfo.renderer;
-    info['WebGL Vendor'] = webglInfo.vendor;
-    info['WebGL Version'] = webglInfo.version;
-    info['WebGL Shading Language'] = webglInfo.shadingLanguage;
+  const numClasses = 80;
+  const numBoxes = 8400;
+
+  let lastTime = performance.now();
+
+  async function detectFrame() {
+    requestAnimationFrame(detectFrame);
+
+    if (!session || loadingModel) return;
+
+    const now = performance.now();
+    if (now - lastTime < 80) return;
+    lastTime = now;
+
+    try {
+      console.log("📸 Capturing frame...");
+      const t0 = performance.now();
+
+      ctx.drawImage(video, 0, 0, 640, 640);
+      const t1 = performance.now();
+      console.log("✔ Frame captured");
+
+      console.log("🧪 Preprocessing...");
+      const imageData = ctx.getImageData(0, 0, 640, 640).data;
+
+      const inputData = new Float32Array(3 * 640 * 640);
+      for (let i = 0; i < 640 * 640; i++) {
+        inputData[i] = imageData[i * 4] / 255;
+        inputData[i + 409600] = imageData[i * 4 + 1] / 255;
+        inputData[i + 819200] = imageData[i * 4 + 2] / 255;
+      }
+      const t2 = performance.now();
+      console.log("✔ Preprocessing completed");
+
+      console.log("⚡ Running inference...");
+      const inputTensor = new ort.Tensor("float32", inputData, [1, 3, 640, 640]);
+      const output = await session.run({ images: inputTensor });
+      const t3 = performance.now();
+      console.log("✔ Inference finished");
+
+      console.log("📝 Postprocessing results...");
+      const key = Object.keys(output)[0];
+      const data = (output[key] as ort.Tensor).data as Float32Array;
+
+      let logText = "";
+
+      for (let i = 0; i < numBoxes; i++) {
+        const offset = i * (numClasses + 5);
+        const objScore = sigmoid(data[offset + 4]);
+
+        let maxScore = 0;
+        let maxClass = 0;
+
+        for (let c = 0; c < numClasses; c++) {
+          const s = sigmoid(data[offset + 5 + c]);
+          if (s > maxScore) {
+            maxScore = s;
+            maxClass = c;
+          }
+        }
+
+        const finalScore = objScore * maxScore;
+
+        if (finalScore >= 0.90) {
+          logText += `${COCO_CLASSES[maxClass]} - ${(finalScore * 100).toFixed(1)}%\n`;
+        }
+      }
+
+      const t4 = performance.now();
+      console.log("✔ Postprocessing completed");
+
+      uiLog.textContent = logText || "(No high confidence detections)";
+
+      console.log(
+        `⏱ Frame ${(t4 - t0).toFixed(1)}ms | ` +
+        `capture ${(t1 - t0).toFixed(1)}ms | preprocess ${(t2 - t1).toFixed(1)}ms | ` +
+        `infer ${(t3 - t2).toFixed(1)}ms | post ${(t4 - t3).toFixed(1)}ms`
+      );
+
+    } catch (err) {
+      console.error("❌ ERROR in detectFrame()", err);
+    }
   }
 
-  info['GPU Delegate'] = 'Not initialized';
-
-  try {
-    const devices = await navigator.mediaDevices.enumerateDevices();
-    const videoDevices = devices.filter(d => d.kind === 'videoinput');
-    info['Video Input Devices'] = videoDevices.length;
-    info['Active Video Device'] = videoDevices[0]?.label || 'Unknown Camera';
-  } catch {
-    info['Video Input Devices'] = 'Access denied';
-  }
-
-  if (video.videoWidth > 0) {
-    info['Video Resolution'] = `${video.videoWidth}x${video.videoHeight}`;
-    info['Video Aspect Ratio'] = (video.videoWidth / video.videoHeight).toFixed(2);
-  } else {
-    info['Video Resolution'] = 'Not available yet';
-  }
-
-  if ('memory' in performance) {
-    const memory = (performance as any).memory;
-    info['JS Heap Used'] = `${(memory.usedJSHeapSize / 1048576).toFixed(2)} MB`;
-    info['JS Heap Total'] = `${(memory.totalJSHeapSize / 1048576).toFixed(2)} MB`;
-    info['JS Heap Limit'] = `${(memory.jsHeapSizeLimit / 1048576).toFixed(2)} MB`;
-  }
-
-  if ('connection' in navigator) {
-    const conn = (navigator as any).connection;
-    info['Connection Type'] = conn?.effectiveType || 'Unknown';
-    info['Connection Downlink'] = conn?.downlink ? `${conn.downlink} Mbps` : 'Unknown';
-  }
-
-  return info;
+  detectFrame();
 }
 
-function renderSystemInfo(info: Record<string, any>) {
-  infoList.innerHTML = '';
-
-  const table = document.createElement('table');
-  table.className = 'system-info-table';
-
-  for (const key in info) {
-    const row = document.createElement('tr');
-
-    const labelCell = document.createElement('td');
-    labelCell.textContent = key;
-    labelCell.className = 'system-info-label';
-
-    const valueCell = document.createElement('td');
-    valueCell.textContent = info[key];
-    valueCell.className = 'system-info-value';
-
-    row.appendChild(labelCell);
-    row.appendChild(valueCell);
-    table.appendChild(row);
-  }
-
-  infoList.appendChild(table);
-}
-
-// initialize page
-const sysInfo = await gatherSystemInfo();
-initCamera();
-runDetection();
-renderSystemInfo(sysInfo);
+main();
