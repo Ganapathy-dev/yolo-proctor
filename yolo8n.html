@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>YOLO-TS Webcam Demo</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      min-height: 100vh;
+      background: linear-gradient(120deg, #cccccc, #666666); 
+      color: #333;
+      padding: 20px;
+    }
+
+    h1 {
+      margin-bottom: 20px;
+      text-align: center;
+      color: #fff;
+      text-shadow: 1px 1px 3px rgba(0,0,0,0.4);
+    }
+
+    p{
+      margin-bottom: 20px;
+      text-align: center;
+      color: #fff;
+      text-shadow: 1px 1px 3px rgba(0,0,0,0.4);
+    }
+
+    #video-wrapper {
+      position: relative;
+      width: 80%;
+      max-width: 800px;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+      background: #000;
+    }
+
+    video, canvas {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+
+    canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      pointer-events: none;
+    }
+
+    #info-panel {
+      margin-top: 15px;
+      background: rgba(255, 255, 255, 0.85);
+      padding: 10px 20px;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+      font-size: 1rem;
+      color: #333;
+    }
+
+    #info-panel ul {
+      list-style: none;
+    }
+
+    #info-panel li {
+      padding: 4px 0;
+    }
+
+    @media (max-width: 600px) {
+      h1 {
+        font-size: 1.5rem;
+      }
+      #video-wrapper {
+        width: 95%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <h1>YOLO-TS Webcam Demo</h1>
+  <p>Yolo8n (nano) by converting onnx to tfjs format.</p>
+  
+  <div id="video-wrapper">
+    <video id="webcam" autoplay muted playsinline></video>
+    <canvas id="canvas"></canvas>
+  </div>
+
+  <!-- Your compiled TypeScript -->
+  <script type="module" src="./src/yolo8n.ts"></script>
+</body>
+</html>
