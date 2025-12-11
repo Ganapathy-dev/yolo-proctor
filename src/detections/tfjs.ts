@@ -2,7 +2,7 @@ import YOLO from "yolo-ts";
 
 const yolo = new YOLO();
 yolo.setup({
-  modelUrl: "./public/yolov8n_web_model/model.json",
+  modelUrl: "/yolo-proctor/yolov8n_web_model/model.json",
   scoreThreshold: 0.3,
   boxLineWidth: 4,
   boxLabels: true
