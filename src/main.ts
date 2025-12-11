@@ -1,3 +1,4 @@
+// @ts-ignore
 import * as tf from '@tensorflow/tfjs'; // <-- important!
 import * as cocoSsd from '@tensorflow-models/coco-ssd';
 
@@ -160,7 +161,11 @@ function renderSystemInfo(info: Record<string, any>) {
 }
 
 // initialize page
-const sysInfo = await gatherSystemInfo();
-initCamera();
-runDetection();
-renderSystemInfo(sysInfo);
+async function main() {
+  const sysInfo = await gatherSystemInfo();
+  renderSystemInfo(sysInfo);
+  initCamera();
+  runDetection();
+}
+
+main();
