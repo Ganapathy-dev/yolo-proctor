@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>YOLO ONNX Detection</title>
+  <link rel="stylesheet" href="/src/style.css" />
+</head>
+<body>
+
+  <div id="sidebar">
+    <h3>YOLO Model</h3>
+    <select id="modelSelector">
+      <option value="/yolo11n-detect.onnx">YOLO11-N (Nano)</option>
+      <option value="/yolo11s-detect.onnx">YOLO11-S (Small)</option>
+      <option value="/yolo11m-detect.onnx">YOLO11-M (Medium)</option>
+      <option value="/yolo12n-detect.onnx">YOLO12-N (Nano)</option>
+      <option value="/yolo12s-detect.onnx" selected>YOLO12-S (Small)</option>
+    </select>
+    <h3 style="margin-top:20px;">Detection Log (90 above)</h3>
+    <div id="log"></div>
+  </div>
+
+  <div id="content">
+    <h1>YOLO ONNX Runtime Detection</h1>
+    <div id="video-wrapper">
+      <video id="webcam" autoplay playsinline></video>
+      <canvas id="canvas" width="640" height="640"></canvas>
+    </div>
+  </div>
+
+  <div id="sysToggle">⚙</div>
+
+  <div id="sysInfo">
+    <h3>System Information</h3>
+    <div id="sysContent">Loading...</div>
+  </div>
+
+  <script type="module" src="/src/yolo_onnx.ts"></script>
+  <script type="module">
+    import { gatherSystemInfo, renderSystemInfo } from './src/utils.ts';
+
+    const sysToggle = document.getElementById('sysToggle');
+    const sysInfo = document.getElementById('sysInfo');
+    const sysContent = document.getElementById('sysContent');
+
+    sysToggle.addEventListener('click', async () => {
+      sysInfo.classList.toggle('open');
+      if (sysInfo.classList.contains('open')) {
+        sysContent.textContent = 'Loading...';
+        const info = await gatherSystemInfo(document.getElementById('webcam'));
+        renderSystemInfo(info, sysContent);
+      }
+    });
+  </script>
+
+</body>
+</html>
