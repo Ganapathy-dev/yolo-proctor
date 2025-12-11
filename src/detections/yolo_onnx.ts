@@ -1,7 +1,7 @@
 const COCO_CLASSES = ["person","chair","couch","bed","laptop","mouse","keyboard","cell phone","book","backpack","bottle","cup"];
 
 import * as ort from "onnxruntime-web";
-import { initCamera } from "./utils";
+import { initCamera } from "../utils";
 
 const video = document.getElementById("webcam") as HTMLVideoElement;
 const uiLog = document.getElementById("log")!;
