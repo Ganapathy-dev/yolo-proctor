@@ -1,77 +1,54 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>YOLO POC</title>
-    <link rel="stylesheet" href="/src/style.css" />
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>YOLO SPA Detection</title>
+  <link rel="stylesheet" href="/src/style.css" />
+</head>
+<body>
 
-    <style>
+    <div id="sidebar">
+      <h3>ONNX Model</h3>
+      <select id="modelSelector">
+        <option value="./public/yolo11n-detect.onnx" selected>YOLO11-N (Nano)</option>
+        <option value="./public/yolo11s-detect.onnx">YOLO11-S (Small)</option>
+        <option value="./public/yolo11m-detect.onnx">YOLO11-M (Medium)</option>
+        <option value="./public/yolo12n-detect.onnx">YOLO12-N (Nano)</option>
+        <option value="./public/yolo12s-detect.onnx">YOLO12-S (Small)</option>
+      </select>
 
-      html, body {
-        margin: 0;
-        padding: 0;
-        height: 100%;
-      }
-
-      body {
-        height: 100vh;
-        display: flex;
-        overflow: hidden;
-        font-family: Arial, sans-serif;
-      }
-
-      #container {
-        display: flex;
-        height: 100%;
-        width: 100%;
-      }
-
-      #system-info {
-        width: 30%;      
-        background: #f5f5f5;
-        padding: 20px;
-        overflow-y: auto;    
-        border-right: 1px solid #ccc;
-      }
-
-      #system-info h2 {
-        margin-top: 0;
-      }
-
-      #video-area {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-      }
-
-    </style>
-  </head>
-
-  <body>
-    <div id="container">
-      <!-- LEFT SIDE: SYSTEM INFO -->
-      <div id="system-info">
-        <h2>System Information</h2>
-        <div id="info-list"></div>
-      </div>
-
-      <!-- RIGHT SIDE: CAMERA + CANVAS OVERLAY -->
-      <div id="video-area">
-        <div id="buttons">
-          <button onclick="window.location.href='yolo_onnx.html'">Yolo onnx runtime</button>
-          <button onclick="window.location.href='yolo8n.html'">Yolo8n-tfjs</button>
-        </div>
-        <h2>webcam Object detection using coco - ssd</h2>
-        <div id="video-wrapper">
-          <video id="webcam" autoplay playsinline></video>
-          <canvas id="canvas"></canvas>
-        </div>
-      </div>
+      <h3 style="margin-top:20px;">Detection Log</h3>
+      <div id="log"></div>
     </div>
 
-    <script type="module" src="/src/main.ts"></script>
-  </body>
+  <!-- Top-right buttons for switching detection mode -->
+  <div id="buttons">
+    <button data-mode="coco">Coco SSD</button>
+    <button data-mode="yolo8n">YOLO8n-TFJS</button>
+    <button data-mode="onnx">YOLO ONNX</button>
+  </div>
+
+  <!-- Main content area -->
+  <div id="content">
+    <div>
+      <h2 id="currentModeTitle"></h2>
+    </div>
+    <div id="video-wrapper">
+      <video id="webcam" autoplay muted playsinline></video>
+      <canvas id="canvas"></canvas>
+    </div>
+  </div>
+
+  <!-- System info toggle -->
+  <div id="sysToggle">⚙</div>
+
+  <!-- System info sidebar -->
+  <div id="sysInfo">
+    <h3>System Information</h3>
+    <div id="sysContent">Loading...</div>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
 </html>

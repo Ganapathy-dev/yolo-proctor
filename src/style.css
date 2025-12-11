@@ -1,3 +1,4 @@
+/* --- General Body --- */
 body {
   display: flex;
   margin: 0;
@@ -7,8 +8,9 @@ body {
   overflow: hidden;
 }
 
+/* --- Sidebar --- */
 #sidebar {
-  width: 330px;
+  width: 300px;
   background: #ffffff;
   padding: 20px;
   box-shadow: 2px 0 10px rgba(0,0,0,0.15);
@@ -16,23 +18,23 @@ body {
   flex-direction: column;
 }
 
-h3 {
+#sidebar h3 {
   margin-bottom: 10px;
-  font-size: 18px;
-  color: #444;
+  font-size: 16px;
+  color: #333;
 }
 
 #modelSelector {
   width: 100%;
-  padding: 10px;
-  font-size: 16px;
+  padding: 8px 10px;
+  font-size: 14px;
   border-radius: 6px;
   border: 1px solid #aaa;
 }
 
 #log {
   margin-top: 20px;
-  height: 70vh;
+  height: calc(100vh - 200px);
   overflow-y: auto;
   background: #fafafa;
   border: 1px solid #ccc;
@@ -42,6 +44,7 @@ h3 {
   white-space: pre-wrap;
 }
 
+/* --- Main Content --- */
 #content {
   flex: 1;
   display: flex;
@@ -50,10 +53,6 @@ h3 {
   justify-content: center;
   padding: 20px;
   position: relative;
-}
-
-#content h1 {
-  margin-bottom: 20px;
 }
 
 #video-wrapper {
@@ -76,6 +75,40 @@ h3 {
   left: 0;
 }
 
+/* --- Top-right buttons --- */
+#buttons {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  display: flex;
+  gap: 12px;
+  z-index: 10;
+}
+
+#buttons button {
+  padding: 10px 18px;
+  border: none;
+  border-radius: 8px;
+  background: #1e1e1e;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 500;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.15);
+  transition: background 0.25s ease, transform 0.2s ease, box-shadow 0.25s ease;
+}
+
+#buttons button:hover {
+  background: #333333;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.25);
+}
+
+#buttons button:active {
+  transform: translateY(0);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* --- System Info Toggle --- */
 #sysToggle {
   position: fixed;
   top: 100px;
@@ -94,6 +127,7 @@ h3 {
   z-index: 1000;
 }
 
+/* --- System Info Sidebar --- */
 #sysInfo {
   position: fixed;
   top: 0;
@@ -138,37 +172,4 @@ h3 {
 #sysInfo .system-info-value {
   width: 60%;
   color: #555;
-}
-
-#buttons {
-  position: absolute;
-  top: 20px;
-  right: 20px;
-  display: flex;
-  gap: 12px;
-  z-index: 10;
-}
-
-#buttons button {
-  padding: 10px 18px;
-  border: none;
-  border-radius: 8px;
-  background: #1e1e1e;
-  color: #ffffff;
-  font-size: 14px;
-  font-weight: 500;
-  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.15);
-  transition: background 0.25s ease, transform 0.2s ease, box-shadow 0.25s ease;
-}
-
-/* Hover effect */
-#buttons button:hover {
-  background: #333333;
-  transform: translateY(-2px);
-  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.25);
-}
-
-#buttons button:active {
-  transform: translateY(0);
-  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.15);
 }
