@@ -8,35 +8,38 @@
 </head>
 <body>
 
-    <div id="sidebar">
-      <h3>ONNX Model</h3>
-      <select id="modelSelector">
-        <option value="/yolo-proctor/yolo11n-detect.onnx" selected>YOLO11-N (Nano)</option>
-        <option value="/yolo-proctor/yolo11s-detect.onnx">YOLO11-S (Small)</option>
-        <option value="/yolo-proctor/yolo11m-detect.onnx">YOLO11-M (Medium)</option>
-        <option value="/yolo-proctor/yolo12n-detect.onnx">YOLO12-N (Nano)</option>
-        <option value="/yolo-proctor/yolo12s-detect.onnx">YOLO12-S (Small)</option>
-      </select>
+  <div id="sidebar">
+    <h3>ONNX Model</h3>
+    <select id="modelSelector">
+      <option value="/yolo-proctor/yolo11n-detect.onnx" selected>YOLO11-N (Nano)</option>
+      <option value="/yolo-proctor/yolo12n-detect.onnx">YOLO12-N (Nano)</option>
+    </select>
 
-      <h3 style="margin-top:20px;">Detection Log</h3>
-      <div id="log"></div>
-    </div>
+    <h3 style="margin-top:20px;">Detection Log</h3>
+    <div id="log"></div>
+  </div>
 
-  <!-- Top-right buttons for switching detection mode -->
   <div id="buttons">
     <button data-mode="coco">Coco SSD</button>
     <button data-mode="yolo8n">YOLO8n-TFJS</button>
     <button data-mode="onnx">YOLO ONNX</button>
   </div>
 
-  <!-- Main content area -->
+  <div id="modeButtons">
+    <button data-mode="webcam">Live Webcam</button>
+    <button data-mode="image">Image Detection</button>
+  </div>
+
   <div id="content">
-    <div>
-      <h2 id="currentModeTitle"></h2>
-    </div>
-    <div id="video-wrapper">
+        <h2 id="currentModeTitle"></h2>
+    <div id="video-wrapper" style="display:none;">
       <video id="webcam" autoplay muted playsinline></video>
       <canvas id="canvas"></canvas>
+    </div>
+
+    <div id="imageContainer" style="display:none;">
+      <input type="file" id="imageInput" accept="image/*" />
+      <canvas id="imageCanvas" style="min-height: 480px; min-width: 640px;"></canvas>
     </div>
   </div>
 
