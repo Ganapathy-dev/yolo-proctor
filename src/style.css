@@ -1,4 +1,4 @@
-/* --- General Body --- */
+
 body {
   display: flex;
   margin: 0;
@@ -44,38 +44,7 @@ body {
   white-space: pre-wrap;
 }
 
-/* --- Main Content --- */
-#content {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-  position: relative;
-}
-
-#video-wrapper {
-  position: relative;
-  width: 640px;
-  height: 640px;
-  border-radius: 15px;
-  overflow: hidden;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.25);
-  background: #000;
-}
-
-#webcam, #canvas {
-  border-radius: 15px;
-}
-
-#canvas {
-  position: absolute;
-  top: 0;
-  left: 0;
-}
-
-/* --- Top-right buttons --- */
+/* --- Top-right model mode buttons --- */
 #buttons {
   position: absolute;
   top: 20px;
@@ -106,6 +75,83 @@ body {
 #buttons button:active {
   transform: translateY(0);
   box-shadow: 0 3px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* --- Top-left input mode buttons --- */
+#modeButtons {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  display: flex;
+  gap: 10px;
+  z-index: 10;
+}
+
+#modeButtons button, #imageInput {
+  padding: 8px 14px;
+  border: none;
+  border-radius: 6px;
+  background: #007bff;
+  color: #fff;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+#modeButtons button:hover {
+  background: #0056b3;
+}
+
+/* --- Content Center --- */
+#content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  width: 100%;
+  height: 100vh;
+}
+
+/* --- Webcam wrapper --- */
+#video-wrapper {
+  position: relative;
+  width: 640px;
+  height: 640px;
+  border-radius: 15px;
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+  background: #000;
+}
+
+#webcam, #canvas {
+  border-radius: 15px;
+}
+
+#canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+/* --- Image uploader --- */
+#imageContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+#imageCanvas {
+  margin-top: 10px;
+  max-width: 100%;
+  max-height: 90vh;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+#video-wrapper, #webcam, #canvas {
+  border-radius: 0 !important;
 }
 
 /* --- System Info Toggle --- */

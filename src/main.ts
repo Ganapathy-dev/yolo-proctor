@@ -1,6 +1,6 @@
-import { runCoco } from "./detections/coco";
-import { runYolo8n } from "./detections/tfjs";
-import { runOnnx } from "./detections/onnx";
+import { runCoco, runCocoImage } from "./detections/coco";
+import { runYolo8n, runYolo8nImage } from "./detections/tfjs";
+import { runOnnx, runOnnxImage } from "./detections/onnx";
 import { gatherSystemInfo, renderSystemInfo, initCamera } from "./utils";
 
 const video = document.getElementById("webcam") as HTMLVideoElement;
@@ -9,9 +9,17 @@ const sysToggle = document.getElementById("sysToggle")!;
 const sysInfo = document.getElementById("sysInfo")!;
 const sysContent = document.getElementById("sysContent")!;
 const buttons = document.querySelectorAll<HTMLButtonElement>("#buttons button");
+const modeButtons = document.querySelectorAll<HTMLButtonElement>("#modeButtons button");
 const currentModeTitle = document.getElementById("currentModeTitle")!;
 const modelSelector = document.getElementById("modelSelector") as HTMLSelectElement;
 const logDiv = document.getElementById("log")!;
+const imageContainer = document.getElementById("imageContainer")!;
+const imageInput = document.getElementById("imageInput") as HTMLInputElement;
+const imageCanvas = document.getElementById("imageCanvas") as HTMLCanvasElement;
+const videoWrapper = document.getElementById("video-wrapper")!;
+
+let currentInputMode: "webcam" | "image" = "image";
+let cameraStarted = false;
 
 sysToggle.addEventListener("click", async () => {
   sysInfo.classList.toggle("open");
@@ -22,15 +30,35 @@ sysToggle.addEventListener("click", async () => {
   }
 });
 
-
 buttons.forEach(btn => {
   btn.addEventListener("click", () => {
     const mode = btn.dataset.mode!;
     if (mode === getModeFromURL()) return;
-    // Reload page with selected mode in URL
     window.location.href = `${window.location.pathname}?mode=${mode}`;
   });
 });
+
+modeButtons.forEach(btn => {
+  btn.addEventListener("click", () => {
+    currentInputMode = btn.dataset.mode as "webcam" | "image";
+    updateInputModeUI();
+    if (currentInputMode === "webcam" && !cameraStarted) {
+      startWebcamDetection();
+    }else{
+      stopWebcam();
+    }
+  });
+});
+
+function updateInputModeUI() {
+  if (currentInputMode === "webcam") {
+    videoWrapper.style.display = "block";
+    imageContainer.style.display = "none";
+  } else {
+    videoWrapper.style.display = "none";
+    imageContainer.style.display = "flex";
+  }
+}
 
 function getModeFromURL(): "coco" | "yolo8n" | "onnx" {
   const mode = new URLSearchParams(window.location.search).get("mode");
@@ -38,22 +66,58 @@ function getModeFromURL(): "coco" | "yolo8n" | "onnx" {
   return "coco";
 }
 
-async function startDetection() {
-  const mode = getModeFromURL();
-  currentModeTitle.textContent =
-    mode === "coco" ? "Coco SSD" :
-    mode === "yolo8n" ? "YOLO8n-TFJS" :
-    "YOLO ONNX";
-
-  (document.getElementById("sidebar")!).style.display = mode === "onnx" ? "block" : "none";
+async function startWebcamDetection() {
+  cameraStarted = true;
+  const modelMode = getModeFromURL();
 
   await initCamera(video);
   canvas.width = video.videoWidth;
   canvas.height = video.videoHeight;
 
-  if (mode === "coco") await runCoco(video, canvas, () => false);
-  if (mode === "yolo8n") await runYolo8n(video, canvas, () => false);
-  if (mode === "onnx") await runOnnx(video, canvas, modelSelector, logDiv);
+  if (modelMode === "coco") await runCoco(video, canvas, () => false);
+  if (modelMode === "yolo8n") await runYolo8n(video, canvas, () => false);
+  if (modelMode === "onnx") await runOnnx(video, canvas, modelSelector, logDiv);
 }
 
-startDetection();
+function stopWebcam() {
+  if (!video.srcObject) return;
+
+  const stream = video.srcObject as MediaStream;
+  stream.getTracks().forEach(track => track.stop());
+  video.srcObject = null;
+  cameraStarted = false;
+}
+
+function setupImageDetection() {
+  const modelMode = getModeFromURL();
+
+  imageInput.addEventListener("change", async () => {
+    const file = imageInput.files?.[0];
+    if (!file) return;
+
+    const img = new Image();
+    img.src = URL.createObjectURL(file);
+    img.onload = async () => {
+      imageCanvas.width = img.width;
+      imageCanvas.height = img.height;
+
+      if (modelMode === "coco") await runCocoImage(img, imageCanvas);
+      if (modelMode === "yolo8n") await runYolo8nImage(img, imageCanvas);
+      // if (modelMode === "onnx") await runOnnxImage(img, imageCanvas, modelSelector);
+    };
+  });
+}
+
+function init() {
+  currentModeTitle.textContent =
+    getModeFromURL() === "coco" ? "Coco SSD" :
+    getModeFromURL() === "yolo8n" ? "YOLO8n-TFJS" :
+    "YOLO ONNX";
+
+  (document.getElementById("sidebar")!).style.display = getModeFromURL() === "onnx" ? "block" : "none";
+
+  updateInputModeUI();
+  setupImageDetection();
+}
+
+init();
