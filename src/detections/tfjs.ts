@@ -10,20 +10,13 @@ yolo.setup({
 
 let yoloModel: any = null;
 
-export async function runYolo8n(
-  video: HTMLVideoElement,
-  canvas: HTMLCanvasElement,
-  stopFlag: () => boolean
-) {
-  if (!yoloModel) yoloModel = await yolo.loadModel();
-
-  const loop = () => {
-    if (stopFlag()) return;
-    yolo.detectVideo(video, yoloModel, canvas);
-    requestAnimationFrame(loop);
+export async function runYolo8n(video: HTMLVideoElement, canvas: HTMLCanvasElement, stopFlag: () => boolean) {
+   if (!yoloModel) yoloModel = await yolo.loadModel();
+  const detect = () => {
+    if(stopFlag()) return;
+    yolo.detectVideo(video, yoloModel!, canvas);
   };
-
-  loop();
+  detect();
 }
 
 export async function runYolo8nImage(

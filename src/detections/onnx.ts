@@ -1,184 +1,278 @@
-import * as ort from "onnxruntime-web";
+import cv from "@techstark/opencv-js";
+import { Tensor, InferenceSession } from "onnxruntime-web";
+import labels from "./labels.json";
 
-const COCO_CLASSES = ["person","chair","couch","bed","laptop","mouse","keyboard","cell phone","book","backpack","bottle","cup"];
+export interface YoloSession {
+  net: InferenceSession;
+  nms: InferenceSession;
+}
 
-export async function runOnnx(
+export interface DetectionBox {
+  label: number;
+  probability: number;
+  bounding: [number, number, number, number]; // [x, y, w, h] in original image coords
+}
+
+const MODEL_INPUT_SHAPE = [1, 3, 640, 640];
+let session: YoloSession | null = null;
+let cvReady = false;
+let initializing = false;
+
+let lastBoxes: DetectionBox[] = [];
+let webcamRunning = false;
+let lastDetectTime = 0;
+const loggedLabelMap: Map<number, HTMLParagraphElement> = new Map();
+
+// ---------------- Debug & Logging ----------------
+// const dbg = (...args: any[]) => console.log("[ONNX-DEBUG]", ...args);
+const logDetection = (msg: string) => {
+  const logDiv = document.getElementById("log");
+  if (logDiv) {
+    const p = document.createElement("p");
+    p.textContent = msg;
+    logDiv.appendChild(p);
+  }
+};
+
+// ---------------- OpenCV Load ----------------
+const loadOpenCV = (): Promise<void> => {
+  return new Promise(resolve => {
+    if (cvReady) return resolve();
+    if ((cv as any).getBuildInformation) {
+      cvReady = true;
+      return resolve();
+    }
+    cv.onRuntimeInitialized = () => {
+      cvReady = true;
+      resolve();
+    };
+  });
+};
+
+// ---------------- Preprocessing (Letterbox) ----------------
+const letterbox = (
+  mat: cv.Mat,
+  targetWidth: number,
+  targetHeight: number
+): { blob: cv.Mat; xScale: number; yScale: number; dx: number; dy: number } => {
+  const origW = mat.cols;
+  const origH = mat.rows;
+
+  const scale = Math.min(targetWidth / origW, targetHeight / origH);
+  const newW = Math.round(origW * scale);
+  const newH = Math.round(origH * scale);
+
+  const dx = Math.floor((targetWidth - newW) / 2);
+  const dy = Math.floor((targetHeight - newH) / 2);
+
+  const resized = new cv.Mat();
+  cv.resize(mat, resized, new cv.Size(newW, newH));
+
+  const padded = new cv.Mat();
+  cv.copyMakeBorder(
+    resized,
+    padded,
+    dy,
+    targetHeight - newH - dy,
+    dx,
+    targetWidth - newW - dx,
+    cv.BORDER_CONSTANT,
+    new cv.Scalar(114, 114, 114)
+  );
+
+  const blob = cv.blobFromImage(padded, 1 / 255.0, new cv.Size(targetWidth, targetHeight), new cv.Scalar(0, 0, 0), true, false);
+
+  resized.delete();
+  padded.delete();
+
+  return { blob, xScale: scale, yScale: scale, dx, dy };
+};
+
+// ---------------- Detection ----------------
+export const detectImage = async (
+  input: HTMLImageElement | HTMLCanvasElement,
+  sess: YoloSession
+): Promise<DetectionBox[]> => {
+  const mat = cv.imread(input as any);
+  const matC3 = new cv.Mat();
+  cv.cvtColor(mat, matC3, cv.COLOR_RGBA2BGR);
+
+  const { blob, xScale, yScale, dx, dy } = letterbox(matC3, MODEL_INPUT_SHAPE[2], MODEL_INPUT_SHAPE[3]);
+  mat.delete();
+  matC3.delete();
+
+  const tensor = new Tensor("float32", blob.data32F, MODEL_INPUT_SHAPE);
+  blob.delete();
+
+  const config = new Tensor("float32", new Float32Array([100, 0.45, 0.25]));
+  const { output0 } = await sess.net.run({ images: tensor });
+  const { selected } = await sess.nms.run({ detection: output0, config });
+
+  const boxes: DetectionBox[] = [];
+  const data = selected.data as Float32Array;
+
+  for (let i = 0; i < selected.dims[1]; i++) {
+    const offset = i * selected.dims[2];
+    const row = data.subarray(offset, offset + selected.dims[2]);
+    const box = row.subarray(0, 4);
+    const scores = row.subarray(4);
+
+    let maxScore = -Infinity;
+    let label = -1;
+    for (let j = 0; j < scores.length; j++) {
+      if (scores[j] > maxScore) {
+        maxScore = scores[j];
+        label = j;
+      }
+    }
+
+    // Map box back to original image coords
+    const x = (box[0] - box[2] / 2 - dx) / xScale;
+    const y = (box[1] - box[3] / 2 - dy) / yScale;
+    const w = box[2] / xScale;
+    const h = box[3] / yScale;
+
+    boxes.push({ label, probability: maxScore, bounding: [x, y, w, h] });
+  }
+
+  return boxes;
+};
+
+// ---------------- ONNX Model Init ----------------
+const initOnnx = async (modelPath: string) => {
+  if (session) return session;
+  if (initializing) {
+    while (!session) await new Promise(r => setTimeout(r, 50));
+    return session;
+  }
+
+  initializing = true;
+  await loadOpenCV();
+
+  const net = await InferenceSession.create(modelPath, { executionProviders: ["webgpu"] });
+  const nms = await InferenceSession.create("/yolo-proctor/nms-yolov8.onnx");
+
+  // Warmup
+  const dummy = new Tensor("float32", new Float32Array(MODEL_INPUT_SHAPE.reduce((a, b) => a * b)), MODEL_INPUT_SHAPE);
+  await net.run({ images: dummy });
+
+  session = { net, nms };
+  initializing = false;
+  return session;
+};
+
+// ---------------- Draw Boxes ----------------
+export const drawYoloPredictions = (boxes: DetectionBox[], ctx: CanvasRenderingContext2D) => {
+  boxes.forEach(box => {
+    const [x, y, w, h] = box.bounding;
+    const labelName = labels[box.label] || "unknown";
+
+    ctx.strokeStyle = "lime";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x, y, w, h);
+
+    ctx.font = "16px Arial";
+    ctx.fillStyle = "lime";
+    ctx.fillText(`${labelName} (${(box.probability * 100).toFixed(1)}%)`, x, y - 5);
+  });
+};
+
+// ---------------- Image Detection ----------------
+export const runOnnxImage = async (image: HTMLImageElement, canvas: HTMLCanvasElement, modelPath: string) => {
+  if (!image.complete || image.naturalWidth === 0) return logDetection("❌ Image not loaded");
+
+  const sess = await initOnnx(modelPath);
+  canvas.width = image.naturalWidth;
+  canvas.height = image.naturalHeight;
+
+  const ctx = canvas.getContext("2d")!;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(image, 0, 0);
+
+  const boxes = await detectImage(image, sess);
+
+  if (!boxes.length) logDetection("No objects detected");
+  else {
+    boxes.forEach((b, i) => logDetection(`Box ${i}: ${labels[b.label]} ${b.probability.toFixed(2)}`));
+    drawYoloPredictions(boxes, ctx);
+  }
+};
+
+// ---------------- Webcam Detection ----------------
+export const runOnnxWebcam = async (
   video: HTMLVideoElement,
   canvas: HTMLCanvasElement,
-  modelSelector: HTMLSelectElement,
-  logDiv: HTMLElement
-) {
+  modelPath: string,
+  interval = 200
+) => {
+  if (!video.srcObject) return console.error("Webcam not started");
+
+  const sess = await initOnnx(modelPath);
   const ctx = canvas.getContext("2d")!;
-  canvas.width = 640;
-  canvas.height = 640;
+  const tempCanvas = document.createElement("canvas");
+  const tempCtx = tempCanvas.getContext("2d")!;
+  webcamRunning = true;
 
-  let session: ort.InferenceSession | null = null;
-  let loadingModel = false;
-  const FRAME_INTERVAL = 80; // ~12 FPS
-  let lastInferenceTime = 0;
+  const process = async (ts: number) => {
+    if (!webcamRunning) return;
 
-  function sigmoid(x: number) { return 1 / (1 + Math.exp(-x)); }
-
-  async function loadModel(path: string) {
-    loadingModel = true;
-    console.time("Model Load");
-    logDiv.textContent = `📥 Loading model: ${path} ...`;
-    try {
-      session = await ort.InferenceSession.create(path, { executionProviders: ["wasm"] });
-      logDiv.textContent = `✅ Loaded model: ${path}`;
-    } catch (err) {
-      console.error("❌ Failed to load model", err);
-      logDiv.textContent = `❌ Failed to load model`;
-    } finally {
-      loadingModel = false;
-      console.timeEnd("Model Load");
+    if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      tempCanvas.width = video.videoWidth;
+      tempCanvas.height = video.videoHeight;
     }
-  }
 
-  modelSelector.addEventListener("change", async () => {
-    await loadModel(modelSelector.value);
-  });
-
-  await loadModel(modelSelector.value);
-
-  // Continuous video rendering
-  function renderLoop() {
-    const t0 = performance.now();
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    const t1 = performance.now();
-    console.log(`Render Loop: ${(t1 - t0).toFixed(1)}ms`);
-    requestAnimationFrame(renderLoop);
-  }
-  renderLoop();
 
-  // NMS function
-  function nonMaxSuppression(boxes: number[][], scores: number[], iouThreshold = 0.5) {
-    const picked: number[] = [];
-    const sorted = scores
-      .map((score, i) => ({ score, i }))
-      .sort((a, b) => b.score - a.score);
+    if (lastBoxes.length) drawYoloPredictions(lastBoxes, ctx);
 
-    while (sorted.length > 0) {
-      const { i } = sorted.shift()!;
-      picked.push(i);
+    if (ts - lastDetectTime >= interval) {
+      lastDetectTime = ts;
+      tempCtx.drawImage(video, 0, 0, tempCanvas.width, tempCanvas.height);
+      const boxes = await detectImage(tempCanvas, sess);
+      lastBoxes = boxes;
 
-      for (let j = sorted.length - 1; j >= 0; j--) {
-        const iou = computeIoU(boxes[i], boxes[sorted[j].i]);
-        if (iou > iouThreshold) sorted.splice(j, 1);
-      }
-    }
-    return picked;
-  }
+      const logDiv = document.getElementById("log");
+      if (!logDiv) return;
 
-  function computeIoU(box1: number[], box2: number[]) {
-    const [x1, y1, x2, y2] = box1;
-    const [x1b, y1b, x2b, y2b] = box2;
-    const xi1 = Math.max(x1, x1b);
-    const yi1 = Math.max(y1, y1b);
-    const xi2 = Math.min(x2, x2b);
-    const yi2 = Math.min(y2, y2b);
-    const inter = Math.max(0, xi2 - xi1) * Math.max(0, yi2 - yi1);
-    const union = (x2 - x1) * (y2 - y1) + (x2b - x1b) * (y2b - y1b) - inter;
-    return inter / union;
-  }
+      // Track currently detected labels
+      const currentLabels = new Set<number>();
+      boxes.forEach((b) => currentLabels.add(b.label));
 
-  async function inferenceLoop() {
-    if (!session || loadingModel) {
-      setTimeout(inferenceLoop, FRAME_INTERVAL);
-      return;
-    }
-
-    const now = performance.now();
-    if (now - lastInferenceTime < FRAME_INTERVAL) {
-      setTimeout(inferenceLoop, FRAME_INTERVAL - (now - lastInferenceTime));
-      return;
-    }
-    lastInferenceTime = now;
-
-    const t0 = performance.now();
-
-    try {
-      // Capture pixels
-      const t1 = performance.now();
-      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
-      console.log(`Pixel Read: ${(t1 - t0).toFixed(1)}ms`);
-
-      // Preprocessing
-      const inputData = new Float32Array(3 * canvas.width * canvas.height);
-      for (let i = 0; i < canvas.width * canvas.height; i++) {
-        inputData[i] = imageData[i*4]/255;
-        inputData[i + canvas.width*canvas.height] = imageData[i*4 + 1]/255;
-        inputData[i + 2*canvas.width*canvas.height] = imageData[i*4 + 2]/255;
-      }
-      const t2 = performance.now();
-      console.log(`Preprocessing: ${(t2 - t1).toFixed(1)}ms`);
-
-      // Run inference
-      const inputTensor = new ort.Tensor("float32", inputData, [1,3,canvas.width,canvas.height]);
-      const t3 = performance.now();
-      const output = await session.run({ images: inputTensor });
-      const t4 = performance.now();
-      console.log(`Inference: ${(t4 - t3).toFixed(1)}ms`);
-
-      const key = Object.keys(output)[0];
-      const data = (output[key] as ort.Tensor).data as Float32Array;
-
-      // Postprocessing
-      const t5 = performance.now();
-      const numClasses = 80;
-      const numBoxes = 8400;
-
-      const boxes: number[][] = [];
-      const scores: number[] = [];
-      const classIndices: number[] = [];
-
-      for (let i = 0; i < numBoxes; i++) {
-        const offset = i*(numClasses+5);
-        const objScore = sigmoid(data[offset+4]);
-        if(objScore < 0.5) continue; // ignore low objectness
-
-        let maxScore = 0, maxClass = 0;
-        for (let c = 0; c < numClasses; c++) {
-          const s = sigmoid(data[offset+5+c]);
-          if(s > maxScore){ maxScore = s; maxClass = c; }
+      // Remove logs for labels no longer detected
+      for (const [label, p] of loggedLabelMap.entries()) {
+        if (!currentLabels.has(label)) {
+          p.remove();
+          loggedLabelMap.delete(label);
         }
-        const finalScore = objScore * maxScore;
-        if(finalScore < 0.5) continue; // confidence threshold
-
-        // Box coordinates (YOLO usually outputs center-x, center-y, width, height)
-        const cx = data[offset];
-        const cy = data[offset+1];
-        const w = data[offset+2];
-        const h = data[offset+3];
-        const x1 = cx - w/2;
-        const y1 = cy - h/2;
-        const x2 = cx + w/2;
-        const y2 = cy + h/2;
-
-        boxes.push([x1, y1, x2, y2]);
-        scores.push(finalScore);
-        classIndices.push(maxClass);
       }
 
-      // Apply NMS
-      const picked = nonMaxSuppression(boxes, scores, 0.5);
+      // Update/add logs for currently detected labels
+      boxes.forEach((b) => {
+        const labelName = labels[b.label] || "unknown";
+        const text = `Label=${labelName} Confidence=${(b.probability * 100).toFixed(1)}%`;
 
-      let logText = "";
-      picked.forEach(i => {
-        logText += `${COCO_CLASSES[classIndices[i]]} - ${(scores[i]*100).toFixed(1)}%\n`;
+        if (loggedLabelMap.has(b.label)) {
+          // Update existing paragraph
+          const p = loggedLabelMap.get(b.label)!;
+          p.textContent = text;
+        } else {
+          // Create new paragraph for this label
+          const p = document.createElement("p");
+          p.textContent = text;
+          logDiv.appendChild(p);
+          loggedLabelMap.set(b.label, p);
+        }
       });
-
-      logDiv.textContent = logText || "(No high confidence detections)";
-      const t6 = performance.now();
-      console.log(`Postprocessing: ${(t6 - t5).toFixed(1)}ms`);
-      console.log(`Total Inference Loop: ${(t6 - t0).toFixed(1)}ms`);
-
-    } catch (err) {
-      console.error("ONNX inference error:", err);
-    } finally {
-      setTimeout(inferenceLoop, 0);
     }
-  }
 
-  inferenceLoop();
-}
+    requestAnimationFrame(process);
+  };
+
+  requestAnimationFrame(process);
+};
+
+
+export const stopOnnxWebcam = () => { webcamRunning = false; };

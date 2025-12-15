@@ -1,6 +1,6 @@
 import { runCoco, runCocoImage } from "./detections/coco";
 import { runYolo8n, runYolo8nImage } from "./detections/tfjs";
-import { runOnnx, runOnnxImage } from "./detections/onnx";
+import { runOnnxImage, runOnnxWebcam, stopOnnxWebcam } from "./detections/onnx";
 import { gatherSystemInfo, renderSystemInfo, initCamera } from "./utils";
 
 const video = document.getElementById("webcam") as HTMLVideoElement;
@@ -11,8 +11,8 @@ const sysContent = document.getElementById("sysContent")!;
 const buttons = document.querySelectorAll<HTMLButtonElement>("#buttons button");
 const modeButtons = document.querySelectorAll<HTMLButtonElement>("#modeButtons button");
 const currentModeTitle = document.getElementById("currentModeTitle")!;
-const modelSelector = document.getElementById("modelSelector") as HTMLSelectElement;
-const logDiv = document.getElementById("log")!;
+// const modelSelector = document.getElementById("modelSelector") as HTMLSelectElement;
+// const logDiv = document.getElementById("log")!;
 const imageContainer = document.getElementById("imageContainer")!;
 const imageInput = document.getElementById("imageInput") as HTMLInputElement;
 const imageCanvas = document.getElementById("imageCanvas") as HTMLCanvasElement;
@@ -76,7 +76,7 @@ async function startWebcamDetection() {
 
   if (modelMode === "coco") await runCoco(video, canvas, () => false);
   if (modelMode === "yolo8n") await runYolo8n(video, canvas, () => false);
-  if (modelMode === "onnx") await runOnnx(video, canvas, modelSelector, logDiv);
+  if (modelMode === "onnx") await runOnnxWebcam(video, canvas, "/yolo-proctor/yolov8n.onnx");
 }
 
 function stopWebcam() {
@@ -86,6 +86,8 @@ function stopWebcam() {
   stream.getTracks().forEach(track => track.stop());
   video.srcObject = null;
   cameraStarted = false;
+
+  stopOnnxWebcam();
 }
 
 function setupImageDetection() {
@@ -103,7 +105,7 @@ function setupImageDetection() {
 
       if (modelMode === "coco") await runCocoImage(img, imageCanvas);
       if (modelMode === "yolo8n") await runYolo8nImage(img, imageCanvas);
-      // if (modelMode === "onnx") await runOnnxImage(img, imageCanvas, modelSelector);
+      if (modelMode === "onnx") await runOnnxImage(img, imageCanvas, "/yolo-proctor/yolov8n.onnx");
     };
   });
 }
