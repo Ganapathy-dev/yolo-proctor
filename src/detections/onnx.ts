@@ -50,43 +50,25 @@ const loadOpenCV = (): Promise<void> => {
 };
 
 // ---------------- Preprocessing (Letterbox) ----------------
-const letterbox = (
-  mat: cv.Mat,
-  targetWidth: number,
-  targetHeight: number
-): { blob: cv.Mat; xScale: number; yScale: number; dx: number; dy: number } => {
+const letterbox = (mat: cv.Mat, targetWidth: number, targetHeight: number) => {
   const origW = mat.cols;
   const origH = mat.rows;
 
-  const scale = Math.min(targetWidth / origW, targetHeight / origH);
-  const newW = Math.round(origW * scale);
-  const newH = Math.round(origH * scale);
+  const maxSize = Math.max(origW, origH);
+  const xPad = maxSize - origW;
+  const yPad = maxSize - origH;
 
-  const dx = Math.floor((targetWidth - newW) / 2);
-  const dy = Math.floor((targetHeight - newH) / 2);
-
-  const resized = new cv.Mat();
-  cv.resize(mat, resized, new cv.Size(newW, newH));
+  const xScale = maxSize / origW;
+  const yScale = maxSize / origH;
 
   const padded = new cv.Mat();
-  cv.copyMakeBorder(
-    resized,
-    padded,
-    dy,
-    targetHeight - newH - dy,
-    dx,
-    targetWidth - newW - dx,
-    cv.BORDER_CONSTANT,
-    new cv.Scalar(114, 114, 114)
-  );
+  cv.copyMakeBorder(mat, padded, 0, yPad, 0, xPad, cv.BORDER_CONSTANT, new cv.Scalar(114,114,114));
 
-  const blob = cv.blobFromImage(padded, 1 / 255.0, new cv.Size(targetWidth, targetHeight), new cv.Scalar(0, 0, 0), true, false);
+  const blob = cv.blobFromImage(padded, 1/255.0, new cv.Size(targetWidth, targetHeight), new cv.Scalar(0,0,0), true, false);
 
-  resized.delete();
-  padded.delete();
-
-  return { blob, xScale: scale, yScale: scale, dx, dy };
+  return { blob, xScale, yScale, dx: xPad/2, dy: yPad/2 };
 };
+
 
 // ---------------- Detection ----------------
 export const detectImage = async (
@@ -127,10 +109,14 @@ export const detectImage = async (
     }
 
     // Map box back to original image coords
-    const x = (box[0] - box[2] / 2 - dx) / xScale;
-    const y = (box[1] - box[3] / 2 - dy) / yScale;
-    const w = box[2] / xScale;
-    const h = box[3] / yScale;
+    // Adjust for scaling and padding to map back to original image
+    const [x, y, w, h] = [
+    (box[0] - box[2] / 2) * xScale - dx,
+    (box[1] - box[3] / 2) * yScale - dy,
+    box[2] * xScale,
+    box[3] * yScale
+    ];
+
 
     boxes.push({ label, probability: maxScore, bounding: [x, y, w, h] });
   }
