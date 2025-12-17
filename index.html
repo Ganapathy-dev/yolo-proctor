@@ -1,58 +1,56 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>YOLO SPA Detection</title>
-  <link rel="stylesheet" href="/src/style.css" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>YOLOv8 Object Detection</title>
+  <link rel="stylesheet" href="./src/style.css">
 </head>
 <body>
+  <div class="App">
 
-  <!-- <div id="sidebar">
-    <h3>ONNX Model</h3>
-    <select id="modelSelector">
-      <option value="/yolo-proctor/yolo11n-detect.onnx" selected>YOLO11-N (Nano)</option>
-      <option value="/yolo-proctor/yolo12n-detect.onnx">YOLO12-N (Nano)</option>
-    </select>
+    <div id="buttons">
+      <button id="modeButtons" data-mode="coco">Coco SSD</button>
+      <button id="modeButtons" data-mode="tfjs">YOLOv8n-TFJS</button>
+      <button id="modeButtons" data-mode="onnx">YOLOv8n-ONNX</button>
+    </div>
+    <div class="header">
+      <h1 id="heading">YOLOv8n Object Detection App</h1>
+      <p id="description">YOLOv8n object detection application live on browser powered by <code>onnxruntime-web</code></p>
+    </div>
 
-    <h3 style="margin-top:20px;">Detection Log</h3>
-    <div id="log"></div>
-  </div> -->
-
-  <div id="buttons">
-    <button data-mode="coco">Coco SSD</button>
-    <button data-mode="yolo8n">YOLO8n-TFJS</button>
-    <a onclick="window.location.href='/yolo-proctor/temp.html'">YOLO ONNX</a>
-
-  </div>
-
-  <div id="modeButtons">
-    <button data-mode="webcam">Live Webcam</button>
-    <button data-mode="image">Image Detection</button>
-  </div>
-
-  <div id="content">
-        <h2 id="currentModeTitle"></h2>
-    <div id="video-wrapper" style="display:none;">
-      <video id="webcam" autoplay muted playsinline></video>
+    <div class="content">
+      <img id="inputImage" src="#" alt="" style="display:none;">
       <canvas id="canvas"></canvas>
+      <video
+        id="webcam"
+        autoplay
+        playsinline
+        muted
+        style="display:none;"
+        ></video>
+
     </div>
 
-    <div id="imageContainer" style="display:none;">
-      <input type="file" id="imageInput" accept="image/*" />
-      <canvas id="imageCanvas" ></canvas> <!--style="min-height: 480px; min-width: 640px;"-->
+    <input type="file" id="imageInput" accept="image/*" style="display:none;">
+
+    <div class="btn-container">
+      <button id="openImageBtn">Open local image</button>
+      <button id="closeImageBtn" style="display:none;">Close image</button>
+      <button id="openWebcamBtn">Use Webcam</button>
+      <button id="stopWebcamBtn" style="display:none;">Stop Webcam</button>
     </div>
   </div>
 
-  <!-- System info toggle -->
-  <div id="sysToggle">⚙</div>
 
-  <!-- System info sidebar -->
-  <div id="sysInfo">
-    <h3>System Information</h3>
-    <div id="sysContent">Loading...</div>
-  </div>
+  <!-- Loader Overlay -->
+<div id="loader" class="wrapper" style="display:none;">
+  <div class="spinner"></div>
+  <p id="loaderText">Loading...</p>
+</div>
 
-  <script type="module" src="/src/main.ts"></script>
+<!-- <script type="module" src="./src/temp.js"></script> -->
+ <script type="module" src="./src/main.js"></script>
+
 </body>
 </html>

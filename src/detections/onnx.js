@@ -1,18 +1,55 @@
 import cv from "@techstark/opencv-js";
+import * as ort from "onnxruntime-web";
 import { Tensor } from "onnxruntime-web";
 import { renderBoxes } from "./renderBox.js";
 
-export async function detectImage(image, canvas, session, topk, iouThreshold, scoreThreshold, inputShape) {
+
+
+let yolov8Session = null;
+let nmsSession = null;
+
+export async function initYoloOnnx() {
+  if (!yolov8Session) {
+    yolov8Session = await ort.InferenceSession.create("./yolov8n.onnx", {
+      executionProviders: ["wasm"]
+    });
+  }
+
+  if (!nmsSession) {
+    nmsSession = await ort.InferenceSession.create("./nms-yolov8.onnx", {
+      executionProviders: ["wasm"]
+    });
+  }
+
+  return { yolov8Session, nmsSession };
+}
+
+
+export async function runOnnxWebcam(sessions, video, canvas) {
+
+  const ctx = canvas.getContext("2d");
+  canvas.width = 640;
+  canvas.height = 640;
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+  await detectImage(canvas, canvas, sessions, 100, 0.45, 0.25, [1, 3, 640, 640]);
+
+  requestAnimationFrame(() => runOnnxWebcam(sessions, video, canvas));
+}
+
+
+export async function detectImage(image, canvas, sessions, topk, iouThreshold, scoreThreshold, inputShape) {
   console.log("Entering detect image");
+  const { yolov8Session, nmsSession } = sessions;
   const [modelWidth, modelHeight] = inputShape.slice(2);
   const [input, xRatio, yRatio] = preprocessing(image, modelWidth, modelHeight);
 
   const tensor = new Tensor("float32", input.data32F, inputShape);
   const config = new Tensor("float32", new Float32Array([topk, iouThreshold, scoreThreshold]));
 
-  const { output0 } = await session.net.run({ images: tensor });
+  const { output0 } = await yolov8Session.run({ images: tensor });
 
-  const { selected } = await session.nms.run({ detection: output0, config });
+  const { selected } = await nmsSession.run({ detection: output0, config });
 
   const boxes = [];
 
