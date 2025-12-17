@@ -1,3 +1,7 @@
+import {initCocoModel, runCocoVideo, runCocoImage} from "./detections/coco.js"
+import { initYoloModel, runYoloVideo, runYoloImage } from "./detections/tfjs.js"
+import { initYoloOnnx, detectImage, runOnnxWebcam } from "./detections/onnx.js"
+
 const inputImage = document.getElementById("inputImage");
 const canvas = document.getElementById("canvas");
 const imageInput = document.getElementById("imageInput");
@@ -114,12 +118,6 @@ closeImageBtn.onclick = () => {
 async function initCoco() {
   showLoader("Loading COCO-SSD...");
 
-  const {
-    initCocoModel,
-    runCocoVideo,
-    runCocoImage
-  } = await import("./detections/coco.js");
-
   const model = await initCocoModel();
 
   hideLoader();
@@ -153,7 +151,6 @@ async function initCoco() {
 async function initTfjsYolo() {
   showLoader("Loading YOLOv8 TFJS...");
 
-  const { initYoloModel, runYoloVideo, runYoloImage } = await import("./detections/tfjs.js");
   const model = await initYoloModel();
 
   hideLoader();
@@ -187,7 +184,6 @@ async function initTfjsYolo() {
 async function initOnnx() {
   showLoader("Loading YOLOv8 ONNX...");
 
-  const { initYoloOnnx, detectImage, runOnnxWebcam } = await import("./detections/onnx.js");
   const sessions = await initYoloOnnx();
 
   hideLoader();
